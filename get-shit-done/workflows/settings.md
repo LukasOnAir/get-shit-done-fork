@@ -88,6 +88,51 @@ AskUserQuestion([
 ```
 </step>
 
+<step name="agent_teams_settings">
+**Only show this step if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is detected in the environment.**
+
+If the env var is NOT set, skip this step entirely.
+
+```
+AskUserQuestion([
+  {
+    question: "Use Agent Teams for parallel workflows? (experimental)",
+    header: "Agent Teams",
+    multiSelect: false,
+    options: [
+      { label: "No (Recommended)", description: "Use standard Task() flow — stable, proven" },
+      { label: "Yes", description: "Use Agent Teams — teammates with messaging, self-claiming tasks" }
+    ]
+  }
+])
+```
+
+**If "Yes":**
+
+```
+AskUserQuestion([
+  {
+    question: "Which workflows should use Agent Teams?",
+    header: "Teams Scope",
+    multiSelect: true,
+    options: [
+      { label: "Research", description: "Researchers challenge each other's findings via messaging" },
+      { label: "Planning", description: "Planner + checker iterate via direct messaging (no lead involvement)" },
+      { label: "Execution", description: "Self-claiming executors — no wave idle time (most impactful)" }
+    ]
+  }
+])
+```
+
+Map selections to config:
+- "Research" selected → `use_for_research: true`
+- "Planning" selected → `use_for_planning: true`
+- "Execution" selected → `use_for_execution: true`
+- Unselected → `false`
+
+**If "No":** Set `agent_teams.enabled: false` (all sub-toggles remain at defaults).
+</step>
+
 <step name="update_config">
 Merge new settings into existing config.json:
 
@@ -102,6 +147,20 @@ Merge new settings into existing config.json:
   },
   "git": {
     "branching_strategy": "none" | "phase" | "milestone"
+  }
+}
+```
+
+**If Agent Teams step was shown**, also merge:
+
+```json
+{
+  "agent_teams": {
+    "enabled": true/false,
+    "use_for_research": true/false,
+    "use_for_planning": true/false,
+    "use_for_execution": true/false,
+    "teammate_mode": "in-process"
   }
 }
 ```
@@ -124,7 +183,18 @@ Display:
 | Plan Checker         | {On/Off} |
 | Execution Verifier   | {On/Off} |
 | Git Branching        | {None/Per Phase/Per Milestone} |
+```
 
+**If Agent Teams step was shown, also include:**
+
+```
+| Agent Teams          | {On/Off} |
+| Teams: Research      | {On/Off} |
+| Teams: Planning      | {On/Off} |
+| Teams: Execution     | {On/Off} |
+```
+
+```
 These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
 Quick commands:
@@ -140,6 +210,7 @@ Quick commands:
 <success_criteria>
 - [ ] Current config read
 - [ ] User presented with 5 settings (profile + 3 workflow toggles + git branching)
-- [ ] Config updated with model_profile, workflow, and git sections
+- [ ] If CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1: Agent Teams settings presented
+- [ ] Config updated with model_profile, workflow, git, and optionally agent_teams sections
 - [ ] Changes confirmed to user
 </success_criteria>

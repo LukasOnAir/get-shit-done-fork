@@ -31,5 +31,12 @@
   "safety": {
     "always_confirm_destructive": true,
     "always_confirm_external_services": true
+  },
+  "agent_teams": {
+    "enabled": false,
+    "use_for_research": true,
+    "use_for_planning": true,
+    "use_for_execution": true,
+    "teammate_mode": "in-process"
   }
 }

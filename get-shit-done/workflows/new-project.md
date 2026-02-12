@@ -384,6 +384,52 @@ Check if this is greenfield or subsequent milestone:
 - If no "Validated" requirements in PROJECT.md → Greenfield (building from scratch)
 - If "Validated" requirements exist → Subsequent milestone (adding to existing app)
 
+**If `teams_available` AND `teams_config.use_for_research`:**
+
+<agent_teams_research_path>
+
+Display spawning indicator:
+```
+◆ Spawning research team (Agent Teams)...
+  → Stack researcher (teammate)
+  → Features researcher (teammate)
+  → Architecture researcher (teammate)
+  → Pitfalls researcher (teammate)
+```
+
+Create a research team with 4 researcher teammates. Each researcher gets the same prompt as the standard Task() path below, PLUS the following `<team_behavior>` block appended to their prompt:
+
+```
+<team_behavior>
+After writing your research file:
+1. Read the other 3 researchers' output files (.planning/research/STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md)
+2. Look for contradictions, gaps, or misalignments between your findings and theirs
+3. Message teammates about specific issues: "Your STACK.md recommends X but my ARCHITECTURE.md found Y is incompatible because Z"
+4. If a teammate's challenge is convincing, update your own file to resolve the contradiction
+5. Mark your task as completed only after cross-checking is done
+</team_behavior>
+```
+
+**Team setup:**
+1. Create team using `Teammates.create_team({ name: "research-{domain}" })`
+2. Create 4 tasks in the shared task list (one per research dimension)
+3. Spawn 4 teammates with `teammate_mode` from config (default: `"in-process"`)
+4. Each teammate gets: researcher prompt + team_behavior block + task assignment
+5. Lead waits for all 4 tasks to complete
+6. Clean up team with `Teammates.cleanup_team()`
+
+After team completes, spawn synthesizer as standard Task() (doesn't need inter-agent comms):
+
+```
+Task(prompt="...", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
+```
+
+</agent_teams_research_path>
+
+**Otherwise (default):**
+
+<standard_research_path>
+
 Display spawning indicator:
 ```
 ◆ Spawning 4 researchers in parallel...
@@ -580,6 +626,8 @@ Commit after writing.
 </output>
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
 ```
+
+</standard_research_path>
 
 Display research complete banner and key findings:
 ```

@@ -72,6 +72,120 @@ Report:
 </step>
 
 <step name="execute_waves">
+
+**If `teams_available` AND `teams_config.use_for_execution`:**
+
+<agent_teams_execution_path>
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► EXECUTING PHASE {X} (Agent Teams)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Step 1: Create ALL plan tasks upfront from PLAN_INDEX**
+
+Read all incomplete plans from the phase. For each plan, create a task in the shared task list:
+
+```
+TaskCreate({
+  subject: "Execute {plan_id}: {plan_name}",
+  description: "Plan file: {phase_dir}/{plan_file}\nPhase: {phase_number}-{phase_name}\nWave: {wave}\n\nExecute all tasks in this plan. Commit each task atomically. Create SUMMARY.md.\n\nIMPORTANT: Do NOT update STATE.md — lead handles state updates.",
+  activeForm: "Executing {plan_id}"
+})
+```
+
+Map `depends_on` from each PLAN.md frontmatter to Teams task `blockedBy`:
+- Build a `plan_id -> task_id` mapping as tasks are created
+- For each plan with `depends_on: [other_plan_id]`, set `addBlockedBy: [mapped_task_id]`
+
+This maps the existing wave/dependency structure directly to Teams task dependencies, eliminating manual wave management.
+
+**Step 2: Spawn executor teammates**
+
+Count: `min(incomplete_plan_count, max_concurrent_agents)` from parallelization config.
+
+Create team: `Teammates.create_team({ name: "execute-phase-{X}" })`
+
+Spawn executor teammates with generic prompt:
+
+```
+<objective>
+You are an executor teammate for Phase {phase_number}-{phase_name}.
+Claim available tasks from the shared task list, execute them, then claim the next.
+</objective>
+
+<execution_context>
+@~/.claude/get-shit-done/workflows/execute-plan.md
+@~/.claude/get-shit-done/templates/summary.md
+@~/.claude/get-shit-done/references/checkpoints.md
+@~/.claude/get-shit-done/references/tdd.md
+</execution_context>
+
+<team_behavior>
+1. Check the shared task list for available (unblocked, unclaimed) tasks
+2. Claim one task by setting yourself as owner and marking it in_progress
+3. Read the plan file path from the task description
+4. Execute all tasks in the plan: commit each atomically, create SUMMARY.md
+5. Mark the task as completed
+6. Check for more available tasks — if any exist, claim and execute the next one
+7. When no more tasks are available, stop
+
+IMPORTANT OVERRIDES:
+- Do NOT update STATE.md — the lead handles all state updates
+- Do NOT claim tasks that have unresolved blockedBy dependencies
+- If you hit a checkpoint (autonomous: false), message the lead with checkpoint details and wait for their response before continuing
+</team_behavior>
+
+<files_to_read>
+Read these files at execution start using the Read tool:
+- Config: .planning/config.json (if exists)
+</files_to_read>
+
+<success_criteria>
+- [ ] All claimed tasks executed
+- [ ] Each task committed individually
+- [ ] SUMMARY.md created for each plan
+</success_criteria>
+```
+
+Each teammate uses `teammate_mode` from config (default: `"in-process"`).
+
+**Step 3: Lead monitors progress**
+
+While tasks remain incomplete:
+- Poll the shared task list periodically
+- For each newly completed task:
+  - Spot-check SUMMARY.md: verify files exist, git commits present, no `Self-Check: FAILED`
+  - Update STATE.md with the completed plan's position and decisions (prevents concurrent write conflicts)
+  - Report progress inline:
+    ```
+    ✓ {plan_id}: {plan_name} — {one-liner from SUMMARY.md}
+    ```
+
+**Step 4: Handle checkpoints**
+
+When an executor teammate messages the lead with checkpoint details:
+1. Lead presents checkpoint to user (same format as `<checkpoint_handling>`)
+2. User responds
+3. Lead messages back to the executor teammate with user's response
+4. Executor continues from where it paused
+
+**Step 5: Completion**
+
+When all tasks are marked complete:
+1. Clean up team: `Teammates.cleanup_team()`
+2. Proceed to `<aggregate_results>` step (unchanged)
+
+**Key advantage:** No wave idle time. As soon as a plan's dependencies are satisfied, any available executor picks it up immediately.
+
+</agent_teams_execution_path>
+
+**Otherwise (default):**
+
+<standard_execution_path>
+
 Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`, sequential if `false`.
 
 **For each wave:**
@@ -169,6 +283,9 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
 6. **Execute checkpoint plans between waves** — see `<checkpoint_handling>`.
 
 7. **Proceed to next wave.**
+
+</standard_execution_path>
+
 </step>
 
 <step name="checkpoint_handling">

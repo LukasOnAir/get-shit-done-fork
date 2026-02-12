@@ -145,6 +145,77 @@ UAT_CONTENT=$(echo "$INIT" | jq -r '.uat_content // empty')
 CONTEXT_CONTENT=$(echo "$INIT" | jq -r '.context_content // empty')
 ```
 
+**If `teams_available` AND `teams_config.use_for_planning`:**
+
+<agent_teams_planning_path>
+
+## 8-12. Planner + Checker as Teammates
+
+Display banner:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ GSD ► PLANNING PHASE {X} (Agent Teams)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+◆ Spawning planner + checker team...
+```
+
+**Team setup:**
+1. Create team: `Teammates.create_team({ name: "plan-phase-{X}" })`
+2. Create 2 tasks in shared task list:
+   - "Create plans for Phase {X}" (assigned to planner)
+   - "Verify plans for Phase {X}" (assigned to checker)
+   - Do NOT use `blockedBy` between these tasks — coordination happens via messaging
+3. Spawn planner teammate with `teammate_mode` from config
+
+**Planner teammate prompt:** Same planner prompt as standard path (planning_context, downstream_consumer, quality_gate), PLUS:
+
+```
+<team_behavior>
+You are the planner teammate in a planning team.
+
+1. Create PLAN.md files as instructed
+2. When plans are ready, message your checker teammate: "Plans ready for review"
+3. Wait for checker's response message
+4. If checker messages "VERIFICATION PASSED": Mark your task as completed
+5. If checker messages issues: Revise plans to address the issues, then message checker "Plans revised, re-check"
+6. Maximum 3 revision iterations — after 3, mark task complete regardless
+
+Read ~/.claude/agents/gsd-planner.md for your role and instructions.
+</team_behavior>
+```
+
+4. Spawn checker teammate with `teammate_mode` from config
+
+**Checker teammate prompt:** Same checker prompt as standard path (verification_context, expected_output), PLUS:
+
+```
+<team_behavior>
+You are the checker teammate in a planning team.
+
+1. Wait for planner's "Plans ready" message before starting verification
+2. Read the PLAN.md files from the phase directory
+3. Verify plans against phase goal, requirements, and user decisions
+4. Message planner with result:
+   - "VERIFICATION PASSED" if all checks pass
+   - Structured issue list if issues found
+5. If planner messages "Plans revised, re-check": Re-verify and respond again
+6. After planner marks task complete OR 3 iterations: Mark your task as completed
+</team_behavior>
+```
+
+5. Lead monitors the shared task list — waits for both tasks to complete
+6. Lead handles planner return the same as step 9 (PLANNING COMPLETE / CHECKPOINT / INCONCLUSIVE)
+7. Clean up team: `Teammates.cleanup_team()`
+
+**Timeout:** If tasks are not completed within 10 minutes, clean up team and report status to user.
+
+</agent_teams_planning_path>
+
+**Otherwise (default):**
+
+<standard_planning_path>
+
 ## 8. Spawn gsd-planner Agent
 
 Display banner:
@@ -316,6 +387,8 @@ After planner returns -> spawn checker again (step 10), increment iteration_coun
 Display: `Max iterations reached. {N} issues remain:` + issue list
 
 Offer: 1) Force proceed, 2) Provide guidance and retry, 3) Abandon
+
+</standard_planning_path>
 
 ## 13. Present Final Status
 

@@ -191,4 +191,64 @@ Squash merge is recommended — keeps main branch history clean while preserving
 
 </branching_strategy_behavior>
 
+<agent_teams_behavior>
+
+**Agent Teams** enables Claude Code's experimental Agent Teams feature for GSD workflows. When active, parallel research, plan-check revision loops, and execution use independent teammate sessions with inter-agent messaging instead of sequential Task() calls.
+
+<agent_teams_schema>
+```json
+"agent_teams": {
+  "enabled": false,
+  "use_for_research": true,
+  "use_for_planning": true,
+  "use_for_execution": true,
+  "teammate_mode": "in-process"
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Master toggle. Off by default — existing Task() flow used |
+| `use_for_research` | `true` | Use Teams for research workflows (new-project, new-milestone) |
+| `use_for_planning` | `true` | Use Teams for plan-check revision loops (plan-phase) |
+| `use_for_execution` | `true` | Use Teams for execution with self-claiming executors (execute-phase) |
+| `teammate_mode` | `"in-process"` | Teammate spawn mode. `"in-process"` = Windows-compatible (no tmux) |
+</agent_teams_schema>
+
+<agent_teams_activation>
+
+**Both conditions must be true for Teams to activate:**
+
+1. Config: `agent_teams.enabled: true` in `.planning/config.json`
+2. Environment: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` must be set
+
+If either is missing, all workflows fall back to standard Task() flow identically.
+
+**Checking availability via init commands:**
+
+All init commands (`init new-project`, `init plan-phase`, `init execute-phase`, `init new-milestone`) return:
+- `teams_available` — `true` only when BOTH conditions are met
+- `teams_config` — the relevant config fields for that workflow
+
+```bash
+INIT=$(node ~/.claude/get-shit-done/bin/gsd-tools.js init execute-phase "1")
+# teams_available: true/false
+# teams_config: { enabled, use_for_execution, teammate_mode }
+```
+</agent_teams_activation>
+
+<agent_teams_notes>
+
+**Windows compatibility:** Default `teammate_mode: "in-process"` works on Windows without tmux. No additional setup required.
+
+**Token impact:** Agent Teams uses additional context for inter-agent messaging. Research teams (4 researchers challenging each other) may use ~20-30% more tokens than standard Task() flow. Plan higher token budgets when Teams is enabled.
+
+**Per-workflow control:** Each workflow can be individually toggled. For example, enable Teams only for execution (greatest impact from eliminating wave idle time) while keeping standard Task() for research and planning.
+
+**Fallback guarantee:** If `teams_available` is `false`, workflows use the existing Task() flow with zero behavioral difference.
+
+</agent_teams_notes>
+
+</agent_teams_behavior>
+
 </planning_config>

@@ -168,6 +168,13 @@ function loadConfig(cwd) {
     verifier: true,
     parallelization: true,
     brave_search: false,
+    agent_teams: {
+      enabled: false,
+      use_for_research: true,
+      use_for_planning: true,
+      use_for_execution: true,
+      teammate_mode: 'in-process',
+    },
   };
 
   try {
@@ -189,6 +196,21 @@ function loadConfig(cwd) {
       return defaults.parallelization;
     })();
 
+    // Parse agent_teams config
+    const agentTeams = (() => {
+      const section = parsed.agent_teams;
+      if (typeof section === 'object' && section !== null) {
+        return {
+          enabled: section.enabled ?? false,
+          use_for_research: section.use_for_research ?? true,
+          use_for_planning: section.use_for_planning ?? true,
+          use_for_execution: section.use_for_execution ?? true,
+          teammate_mode: section.teammate_mode ?? 'in-process',
+        };
+      }
+      return defaults.agent_teams;
+    })();
+
     return {
       model_profile: get('model_profile') ?? defaults.model_profile,
       commit_docs: get('commit_docs', { section: 'planning', field: 'commit_docs' }) ?? defaults.commit_docs,
@@ -201,10 +223,15 @@ function loadConfig(cwd) {
       verifier: get('verifier', { section: 'workflow', field: 'verifier' }) ?? defaults.verifier,
       parallelization,
       brave_search: get('brave_search') ?? defaults.brave_search,
+      agent_teams: agentTeams,
     };
   } catch {
     return defaults;
   }
+}
+
+function detectAgentTeams() {
+  return process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === '1';
 }
 
 function isGitIgnored(cwd, targetPath) {
@@ -608,6 +635,13 @@ function cmdConfigEnsureSection(cwd, raw) {
     },
     parallelization: true,
     brave_search: hasBraveSearch,
+    agent_teams: {
+      enabled: false,
+      use_for_research: true,
+      use_for_planning: true,
+      use_for_execution: true,
+      teammate_mode: 'in-process',
+    },
   };
 
   try {
@@ -3618,6 +3652,14 @@ function cmdInitExecutePhase(cwd, phase, includes, raw) {
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
     config_exists: pathExistsInternal(cwd, '.planning/config.json'),
+
+    // Agent Teams
+    teams_available: detectAgentTeams() && config.agent_teams.enabled,
+    teams_config: {
+      enabled: config.agent_teams.enabled,
+      use_for_execution: config.agent_teams.use_for_execution,
+      teammate_mode: config.agent_teams.teammate_mode,
+    },
   };
 
   // Include file contents if requested via --include
@@ -3670,6 +3712,14 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
     // Environment
     planning_exists: pathExistsInternal(cwd, '.planning'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
+
+    // Agent Teams
+    teams_available: detectAgentTeams() && config.agent_teams.enabled,
+    teams_config: {
+      enabled: config.agent_teams.enabled,
+      use_for_planning: config.agent_teams.use_for_planning,
+      teammate_mode: config.agent_teams.teammate_mode,
+    },
   };
 
   // Include file contents if requested via --include
@@ -3781,6 +3831,14 @@ function cmdInitNewProject(cwd, raw) {
 
     // Enhanced search
     brave_search_available: hasBraveSearch,
+
+    // Agent Teams
+    teams_available: detectAgentTeams() && config.agent_teams.enabled,
+    teams_config: {
+      enabled: config.agent_teams.enabled,
+      use_for_research: config.agent_teams.use_for_research,
+      teammate_mode: config.agent_teams.teammate_mode,
+    },
   };
 
   output(result, raw);
@@ -3808,6 +3866,14 @@ function cmdInitNewMilestone(cwd, raw) {
     project_exists: pathExistsInternal(cwd, '.planning/PROJECT.md'),
     roadmap_exists: pathExistsInternal(cwd, '.planning/ROADMAP.md'),
     state_exists: pathExistsInternal(cwd, '.planning/STATE.md'),
+
+    // Agent Teams
+    teams_available: detectAgentTeams() && config.agent_teams.enabled,
+    teams_config: {
+      enabled: config.agent_teams.enabled,
+      use_for_research: config.agent_teams.use_for_research,
+      teammate_mode: config.agent_teams.teammate_mode,
+    },
   };
 
   output(result, raw);
