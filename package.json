@@ -1,14 +1,14 @@
 {
-  "name": "get-shit-done-cc",
+  "name": "get-shit-done-cc-teams",
   "version": "1.18.0",
   "description": "A meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode and Gemini by TÂCHES.",
   "bin": {
-    "get-shit-done-cc": "bin/install.js"
+    "get-shit-done-cc-teams": "bin/install.js"
   },
   "files": [
     "bin",
     "commands",
-    "get-shit-done",
+    "get-shit-done-teams",
     "agents",
     "hooks/dist",
     "scripts"
@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/glittercowboy/get-shit-done",
   "bugs": {
-    "url": "https://github.com/glittercowboy/get-shit-done/issues"
+    "url": "https://github.com/glittercowboy/get-shit-done-teams/issues"
   },
   "engines": {
     "node": ">=16.7.0"
@@ -43,6 +43,6 @@
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
-    "test": "node --test get-shit-done/bin/gsd-tools.test.js"
+    "test": "node --test get-shit-done-teams/bin/gsd-teams-tools.test.js"
   }
 }
